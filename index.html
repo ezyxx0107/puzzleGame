@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, 
+                                   initial-scale=1.0, 
+                                   maximum-scale=1.0, 
+                                   user-scalable=no">
+  <title> 移动拼图 </title>
+  <title>Puzzle Game</title>
+  <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/4.1.0/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="index.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/vue/2.5.2/vue.min.js"></script>
+  <script src="https://cdn.bootcdn.net/ajax/libs/axios/0.21.0/axios.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <div class="btns center">
+      <p @click="startGame">{{ timer? '复原':'开始'}}</p>
+      <p @click="changeLevel">{{ levelEnum[level] }}</p>
+      <p @click="showRule = true">规则奖励</p>
+      <p @click="showImage = true">查看原图</p>
+      <p @click="getRandomImg" v-show="!timer">换图</p>
+    </div>
+    <p class="timer">
+      英雄，您已作战 <span class="red">{{ time }}</span> 秒
+    </p>
+    <div class="wrap">
+      <div v-for="(element, index) in imgRandArr" :key="element.id" class="split-box" :class="{'selected':el && el.index == element.index}" :style="element.style" @click="clickImageFn(element, index)"></div>
+    </div>
+		<!-- Modal 游戏原图-->
+		<div class="model show fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" v-if="showImage">
+			<div class="modal-dialog">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title" id="exampleModalLabel">查看游戏原图</h5>
+						<button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="showImage = false">
+							<span aria-hidden="true">&times;</span>
+						</button>
+					</div>
+					<div class="modal-body">
+						<img id="cheakImg" src="./man.jpg" width="300px" height="300px" style="object-fit: cover;" />
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- Modal 游戏介绍-->
+		<div class="model fade show" id="staticBackdrop" data-backdrop="static" data-keyboard="false" tabindex="-1" role="dialog"
+		 aria-labelledby="staticBackdropLabel" aria-hidden="true" v-if="showRule">
+			<div class="modal-dialog">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title" id="staticBackdropLabel">游戏介绍</h5>
+						<button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="showRule = false">
+							<span aria-hidden="true">&times;</span>
+						</button>
+					</div>
+					<div class="modal-body">
+						<p>1、点击游戏难度（4x4）以更改</p>
+						<p>2、点击开始游戏，打乱图片</p>
+						<p>3、交换图片位置，复原图片</p>
+						<p>4、凡游戏通关者皆有奖励</p>
+						<p>5、已登录网站的用户打破最新记录会被记录史书,成为最快通关英雄</p>
+						<p>6、已登录网站的用户90秒完成奖励5积分；120秒内完成奖励3积分；180秒内完成奖励1积分，超过180秒完成奖励0.5积分</p>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-primary"  @click="showRule = false">我知道啦</button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- Modal 游戏广告-->
+		<div class="model fade show" id="staticBackdrops" data-backdrop="static" data-keyboard="false" tabindex="-1" role="dialog"
+		 aria-labelledby="staticBackdropLabel" aria-hidden="true" v-if="showAD">
+			<div class="modal-dialog">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title" id="staticBackdropLabel">
+							<div class="wrap" style="height: auto;">
+								<div class="box">
+                  <span></span>
+									<p class="text">要开始了，准备好了吗？</p>
+								</div>
+							</div>
+						</h5>
+					</div>
+					<div class="modal-body" id="model-advertbody">
+            <video autoplay="autoplay" class="video" id="myvideo" 
+              controls="controls" style="height:200px;object-fit:fill" v-if="videoUrl">
+              <source :src="videoUrl" type="video/mp4">
+            </video>
+            <img :src="imgUrl" style="object-fit:cover;" v-if="imgUrl"/>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- alert 通关提示-->
+
+		<!-- Modal 通关奖励-->
+		<div class="model fade show" id="staticBackdropgift" data-backdrop="static" data-keyboard="false" tabindex="-1" role="dialog"
+		 aria-labelledby="staticBackdropLabel" aria-hidden="true" v-if="showGifts">
+			<div class="modal-dialog">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title" id="staticBackdropLabel">通关奖励</h5>
+						<button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="showGifts = false">
+							<span aria-hidden="true">&times;</span>
+						</button>
+					</div>
+					<div class="modal-body">
+						<div id="gift" class="gifts">
+							<div v-for="item in giftList" :key="item.ID" class="gift">
+								<img id="leftImg" :src="item.LiWuImg" style="object-fit: cover;" />
+								<p id="leftTitle" style="text-align: center;color: red;font-weight: 800;font-size: 14px;">{{ item.LiWuMing }}</p>
+								<p style="text-align:justify!important;border: #000000 solid 1px;padding:8px;">
+									<span :id="item.ID" style="word-break: break-all;">
+                    {{ item.LiWuHref }}
+									</span>
+									<button type="button" id="CopyBtn" @click="copyTextFn(item.ID)">点击可复制链接</button>
+								</p>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+    </div>
+    <!-- 游戏信息 -->
+    <div class="record">
+      <div style="margin: 10px 20px">
+        <div style="float: left;">最快通关英雄:<a id="ZuiKuaiYHM" style="color: red;">{{ gameRecord.ZuiKuaiYHM }}</a></div>
+        <div>
+          <div style="float: right;">最快通关用时:<a id="ZuiKuaiTime" style="color: red;">{{ gameRecord.ZuiKuaiTime }}</a>秒</div>
+        </div>
+      </div>
+      <div style="margin: 0 20px">
+        <div style="float: left;">游戏累计玩家:<a id="WanJiaCount" style="color: red;">{{ gameRecord.WanJiaCount }}</a>人</div>
+        <div>
+          <div style="float: right;">当前在线玩家:<a id="OnlineWanJia" style="color: red;">{{ gameRecord.OnlineWanJia }}</a>人</div>
+        </div>
+      </div>
+    </div>
+  <script>
+    new Vue({
+      el: '#app',
+      data: {
+        puzzleImg: "", // 拼图图片
+        imgOrigArr: [], // 原始切割图片数组
+        imgRandArr: [], // 打乱后的图片数组，用于DOM显示
+        // 游戏难度
+        level: 0,
+        levelEnum: [ '4x4', '6x6'],
+        levelArr: [
+          [4, 4],
+          [6, 6],
+        ],
+        // 计时器
+        timer: null,
+        time: 0,
+        // 弹框  
+        showRule: false,
+        showImage: false,
+        showAD: false,
+        showGifts: false,
+        // 游戏记录
+        gameRecord: {
+          OnlineWanJia: "",
+          WanJiaCount: "",
+          ZuiKuaiTime: "",
+          ZuiKuaiYHM: ""
+        },
+        // 拼图交互
+        el: null, // 选中需要置换的图片
+        randIndex: null, // 选中图片在imgRandArr的index
+        // 礼物
+        giftList: [], 
+        // 广告
+        imgUrl: "",
+        videoUrl: ""
+      },
+      created() {
+        this.resetInit();
+        this.getGameRecordInfo();
+      },
+      methods: {
+        // 开始游戏
+        startGame() {
+          // 判断是否在游戏中
+          if (this.timer) {
+            if (!confirm('已经在游戏中，确定要回复原图？')) return
+            // 初始化所有内容
+            this.resetInit();
+            return
+          }
+          // 加载广告
+          this.showADFn().then(() => {
+            // 开始游戏
+            this.imgSplitFn();
+            this.randomArrFn();
+            this.setTimerFn();
+          });
+        },
+        // 重置初始化
+        resetInit() {
+          this.resetTimerFn(); // 清除计时器
+          this.imgSplitFn(); // 图片重新切割
+          // 重置拼图，更新DOM
+          this.$nextTick(() => {
+            this.imgRandArr = this.imgOrigArr;
+          })
+        },
+        // 开始游戏的广告加载
+        showADFn() {
+          return new Promise((reject) => {
+            axios.get('http://www.yuledou.net/Home/RandomAdver').then((res)=>{
+              const url = res.data.GuangGaoURL;
+              if (url.substr(-3, 3) == "jpg" 
+                || url.substr(-3, 3) == "png" 
+                || url.substr(-3, 3) == "GIF") {
+                this.imgUrl = url;
+              } else {
+                this.videoUrl = url;
+              }
+              this.showAD = true;
+              const that = this;
+              // 10s后开始游戏
+              const timer = setTimeout(() => {
+                that.showAD = false;
+                clearTimeout(timer);
+                reject();
+              }, 10000)
+            })
+          })
+        },
+        // 图片分割
+        imgSplitFn() {
+          let imgOrigArr = []; //清空正确排序的数组
+          // 固定宽高300px，拆分为碎片后，每一块碎片的宽高
+          const cellWidth = 300 / this.levelArr[this.level][1];
+          const cellHeight = 300 / this.levelArr[this.level][0];
+          //必须清空图片区域的碎片代码，否则每一次拆分图片是与之前拆分的累积
+          //例如第一次拆分3x3,插入了9个div，但没有清空，第二次拆分4x4，此时是在前9个div之后再插入14个div，共9+16个div
+          let cell = ""; //记录单个图片碎片的变量
+          for (var i = 0; i < this.levelArr[this.level][0]; i++) {
+            for (var j = 0; j < this.levelArr[this.level][1]; j++) {
+              //将碎片所属div的下标存入数组，用于最终校验是否排序完成
+              imgOrigArr.push({
+                index: i * this.levelArr[this.level][1] + j,
+                style: {
+                  width: cellWidth - 2 + "px",
+                  height: cellHeight - 2 + "px",
+                  left: j * cellWidth + "px",
+                  top: i * cellHeight + "px",
+                  backgroundImage: `url('${this.puzzleImg || './man.jpg'}')`,
+                  backgroundPosition: (-j) * cellWidth + 'px ' + (-i) * cellHeight + 'px'
+                }
+              });
+            }
+          }
+          this.imgOrigArr = imgOrigArr; // 存储原始的切割好的图片数组，用于校验拼图是否完成
+        },
+        // 切割后的图片数组随机排序
+        randomArrFn() {
+          //清空数组
+          this.imgRandArr = [];
+          var order; //记录随机数，记录图片放置在什么位置
+          for (var i = 0, len = this.imgOrigArr.length; i < len; i++) {
+            order = Math.floor(Math.random() * len);
+            if (this.imgRandArr.length > 0) {
+              while (this.imgRandArr.findIndex(e => e.index === order) > -1) {
+                order = Math.floor(Math.random() * len);
+              }
+            }
+            this.imgRandArr.push({
+              index: order, 
+              style: Object.assign({},this.imgOrigArr[order].style, {
+                left: this.imgOrigArr[i].style.left,
+                top: this.imgOrigArr[i].style.top,
+              })
+            });
+          }
+        },
+        // 计时器，开始计时
+        setTimerFn() {
+          const that = this;
+          this.timer = setInterval(() => {
+            that.time += 1;
+          }, 1000);
+        },
+        // 清空计时器
+        resetTimerFn() {
+          clearInterval(this.timer);
+          this.timer = null;
+          this.time = 0;
+        },
+        // 选中图片
+        clickImageFn(el, index) {
+          if (!this.el) {
+            // 第一个选中的图片存储该图片信息和乱序角标
+            this.el = el
+            this.randIndex = index;
+          } else {
+            // 非第一个选中的图片，进行置换
+            this.changeImageFn(el, index);
+          }
+        },
+        // 置换碎片位置
+        changeImageFn(el, index) {
+          let list = this.imgRandArr;
+          // 置换定位css
+          const newPositon = el;
+          const oldPositon = this.el;
+          list[this.randIndex]= {
+            index: newPositon.index,
+            style: Object.assign({}, newPositon.style, {
+            left: oldPositon.style.left,
+            top: oldPositon.style.top,
+            })
+          }
+          list[index]  = {
+            index: oldPositon.index,
+            style: Object.assign({}, oldPositon.style, {
+            left: newPositon.style.left,
+            top: newPositon.style.top,
+            })
+          }
+          // 重置参数
+          this.el = null;
+          this.randIndex = null;
+          // 更新DOM结构
+          this.$nextTick(() => {
+            this.imgRandArr = list;
+          })
+          this.checkSuccessFn();
+        },
+        // 拼图是否完成
+        checkSuccessFn() {
+          if(this.imgOrigArr.map(e => e.index).toString() === this.imgRandArr.map(e => e.index).toString()) {
+            this.updateRecordFn();
+            this.resetInit();
+            this.getGifFn();
+          }
+        },
+        // 游戏难度切换
+        changeLevel() {
+          if (this.timer && !confirm('您已经在游戏中，确定要改变游戏难度么？')) return;
+          this.level = this.level === 0 ? 1 : 0;
+          this.imgSplitFn();
+          this.resetInit();
+        },
+        // 切换图片
+        getRandomImg() {
+          axios.get(`http://www.yuledou.net/Game/CheakPuzzle?YouXiNanDu=${this.levelEnum[this.level]}`).then((res) => {
+            this.puzzleImg = `http://8.134.10.208:8085/TuPian/${res.data.RandomImg}.jpg`;
+            this.resetInit();
+          })
+        },
+        // 游戏记录
+        getGameRecordInfo() {
+          axios.get('http://www.yuledou.net/Game/GetPuzzle', {
+            YouXiNanDu: this.levelArr[this.level]
+          }).then((res)=>{
+            this.gameRecord = res.data;
+            this.resetInit();
+          })
+        },
+        // 游戏完成更新记录
+        updateRecordFn() {
+          axios.get(`http://www.yuledou.net/Game/UpdGameRecord?YouXiNanDu=${this.levelArr[this.level]}&GameTime=${this.time}`).then((res)=>{
+            if (res.data.code == "0") {
+              alert('很遗憾，没有打破记录呢！');
+              alert('请不要灰心，系统会送您一份礼物！');
+            } else if (res.data.code == "1") {
+              alert('恭喜您,成为最新记录的创造英雄!您将获得通关奖励');
+            } else if (res.data.code == "2") {
+              alert('好可惜，差一秒就可以成为最强的英雄哦！');
+              alert('请不要灰心，系统会送您一份礼物！');
+            } else {
+              alert('恭喜您，成功完成本次游戏!您将获得一份通关奖励');
+            }
+          })
+        },
+        // 获取礼物
+        getGifFn() {
+          axios.get('http://www.yuledou.net/Game/RandomGift').then((res) => {
+            this.giftList = res.data.RandomGameLiWu;
+            this.showGifts = true;
+          })
+        },
+        // 选中文本
+        selectText(element) {
+          var text = document.getElementById(element);
+          //做下兼容
+          if (document.body.createTextRange) { //如果支持
+            var range = document.body.createTextRange(); //获取range
+            range.moveToElementText(text); //光标移上去
+            range.select(); //选择
+          } else if (window.getSelection) {
+            var selection = window.getSelection(); //获取selection
+            var range = document.createRange(); //创建range
+            range.selectNodeContents(text); //选择节点内容
+            selection.removeAllRanges(); //移除所有range
+            selection.addRange(range); //添加range
+          } else {
+            alert("复制失败");
+          }
+        },
+        // 复制文本
+        copyTextFn(domId) {
+          console.log(domId)
+					this.selectText(domId);
+					document.execCommand('copy');
+					this.showGifts = false;
+					alert("复制成功！");
+        }
+      }
+    })
+  </script>
+</body>
+</html>
