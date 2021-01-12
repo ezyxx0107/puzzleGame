@@ -18,8 +18,7 @@
   <div id="app">
     <div class="btns center">
       <p @click="startGame">{{ timer? '复原':'开始'}}</p>
-      <!-- <p @click="changeLevel">{{ levelEnum[level] }}</p> -->
-      <p>{{ levelEnum[level] }}</p>
+      <p @click="changeLevel">{{ levelEnum[level] }}</p>
       <p @click="showRule = true">规则奖励</p>
       <p @click="showImage = true">查看原图</p>
       <p @click="getRandomImg" v-show="!timer">换图</p>
@@ -41,7 +40,7 @@
 						</button>
 					</div>
 					<div class="modal-body">
-						<img id="cheakImg" src="./man.jpg" width="300px" height="300px" style="object-fit: cover;" />
+						<img id="cheakImg" :src="puzzleImg || './man.jpg'" width="300px" height="300px" style="object-fit: cover;" />
 					</div>
 				</div>
 			</div>
@@ -57,8 +56,8 @@
 							<span aria-hidden="true">&times;</span>
 						</button>
 					</div>
-					<div class="modal-body">
-						<p>1、点击游戏难度（4x4）以更改</p>
+					<div class="modal-body game-desc">
+						<p>1、点击游戏难度（{{ levelEnum[level] }}）以更改</p>
 						<p>2、点击开始游戏，打乱图片</p>
 						<p>3、交换图片位置，复原图片</p>
 						<p>4、凡游戏通关者皆有奖励</p>
@@ -97,7 +96,21 @@
 			</div>
 		</div>
 		<!-- alert 通关提示-->
-
+    <div class="model show fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" v-if="showConfirmImage">
+			<div class="modal-dialog">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title" id="exampleModalLabel">拼图完成</h5>
+					</div>
+					<div class="modal-body">
+						<img id="cheakImg" :src="comfirmDialogImg" width="300px" height="300px" style="object-fit: cover;" />
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-primary"  @click="finishedGameFn()">我知道啦</button>
+					</div>
+				</div>
+			</div>
+		</div>
 		<!-- Modal 通关奖励-->
 		<div class="model fade show" id="staticBackdropgift" data-backdrop="static" data-keyboard="false" tabindex="-1" role="dialog"
 		 aria-labelledby="staticBackdropLabel" aria-hidden="true" v-if="showGifts">
@@ -149,21 +162,22 @@
         imgOrigArr: [], // 原始切割图片数组
         imgRandArr: [], // 打乱后的图片数组，用于DOM显示
         // 游戏难度
-        level: 1,
-        levelEnum: [ '4x4','5x5', '6x6'],
-        levelArr: [
+        level: 0, // 当前难度levelEnum的index，默认难度5x5
+        levelEnum: [ '4x4','5x5', '6x6'], // 难度枚举
+        levelArr: [ // 用于图片切割的
           [4, 4],
           [5, 5],
           [6, 6],
         ],
         // 计时器
-        timer: null,
-        time: 0,
+        timer: null, // 计时器
+        time: 0, // 游戏时间
         // 弹框  
-        showRule: false,
-        showImage: false,
-        showAD: false,
-        showGifts: false,
+        showRule: false, // 是否显示游戏介绍的弹框
+        showImage: false, // 是否显示原图的弹框
+        showAD: false,  // 是否显示广告的弹框
+        showGifts: false, // 是否显示礼物的弹框
+        showConfirmImage: false,  // 是否显示游戏完成的弹框
         // 游戏记录
         gameRecord: {
           OnlineWanJia: "",
@@ -175,14 +189,16 @@
         el: null, // 选中需要置换的图片
         randIndex: null, // 选中图片在imgRandArr的index
         // 礼物
-        giftList: [], 
+        giftList: [],  // 礼物Array
         // 广告
-        imgUrl: "",
-        videoUrl: ""
+        imgUrl: "", // 广告的图片链接
+        videoUrl: "",  // 广告的视频链接
+        // 游戏完成
+        comfirmDialogImg: "" // 游戏完成显示的图片
       },
       created() {
-        this.resetInit();
-        this.getGameRecordInfo();
+        this.resetInit(); // 重置初始化
+        this.getGameRecordInfo(); // 获取游戏记录信息
       },
       methods: {
         // 开始游戏
@@ -297,6 +313,7 @@
         },
         // 选中图片
         clickImageFn(el, index) {
+          if (!this.timer) return; // 游戏未开始 不触发
           if (!this.el) {
             // 第一个选中的图片存储该图片信息和乱序角标
             this.el = el
@@ -338,10 +355,17 @@
         // 拼图是否完成
         checkSuccessFn() {
           if(this.imgOrigArr.map(e => e.index).toString() === this.imgRandArr.map(e => e.index).toString()) {
-            this.updateRecordFn();
-            this.resetInit();
-            this.getGifFn();
+            this.showConfirmImageFn();
+            clearInterval(this.timer); // 停止计时
           }
+        },
+        // 显示游戏完成图片
+        showConfirmImageFn() {
+          const RandomImgId = '49C1C600D6AF410AABD83CED7146DD1C';
+          axios.get(`http://www.yuledou.net/Game/GetRelativeImg?RandomImgId=${RandomImgId}`).then((res) => {
+            this.comfirmDialogImg = res.data.RelativeImgUrl;
+            this.showConfirmImage = true;
+          })
         },
         // 游戏难度切换
         changeLevel() {
@@ -366,6 +390,12 @@
             this.resetInit();
           })
         },
+        // 游戏完成
+        finishedGameFn() {
+          this.showConfirmImage = false;
+          this.updateRecordFn();  
+          this.resetInit();
+        },
         // 游戏完成更新记录
         updateRecordFn() {
           axios.get(`http://www.yuledou.net/Game/UpdGameRecord?YouXiNanDu=${this.levelArr[this.level]}&GameTime=${this.time}`).then((res)=>{
@@ -380,16 +410,20 @@
             } else {
               alert('恭喜您，成功完成本次游戏!您将获得一份通关奖励');
             }
+            this.getGifFn();
           })
         },
         // 获取礼物
         getGifFn() {
           axios.get('http://www.yuledou.net/Game/RandomGift').then((res) => {
-            this.giftList = res.data.RandomGameLiWu;
-            this.showGifts = true;
+            this.giftList = res.data.RandomGameLiWu;  
+            this.showGifts = true;  // 显示弹框
           })
         },
-        // 选中文本
+        /* 
+          选中文本
+          @params element 标签的id
+        */
         selectText(element) {
           var text = document.getElementById(element);
           //做下兼容
@@ -407,9 +441,11 @@
             alert("复制失败");
           }
         },
-        // 复制文本
+        /* 
+          复制文本
+          @params domId 标签的id
+        */
         copyTextFn(domId) {
-          console.log(domId)
 					this.selectText(domId);
 					document.execCommand('copy');
 					this.showGifts = false;
